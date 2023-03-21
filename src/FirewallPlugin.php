@@ -5,16 +5,20 @@ namespace Firewall;
 
 use Cake\Console\CommandCollection;
 use Cake\Core\BasePlugin;
+use Cake\Core\Configure;
 use Cake\Core\ContainerInterface;
 use Cake\Core\PluginApplicationInterface;
 use Cake\Http\MiddlewareQueue;
+use Cake\Routing\Middleware\RoutingMiddleware;
 use Cake\Routing\RouteBuilder;
+use Firewall\Middleware\FirewallMiddleware;
 
 /**
  * Plugin for Firewall
  */
 class FirewallPlugin extends BasePlugin
 {
+
     /**
      * Load all the plugin configuration and bootstrap logic.
      *
@@ -26,6 +30,28 @@ class FirewallPlugin extends BasePlugin
      */
     public function bootstrap(PluginApplicationInterface $app): void
     {
+        /**
+         * Shieldon
+         */
+        $storageDir = TMP . 'shieldon_firewall';
+        if (!is_dir($storageDir)) {
+            @mkdir($storageDir);
+        }
+
+        /**
+         * Configuration / Settings
+         */
+        Configure::load('Firewall.firewall');
+        if (\Cake\Core\Plugin::isLoaded("Settings")) {
+            Configure::load('Firewall', 'settings');
+        }
+
+        /**
+         * Admin
+         */
+        if (\Cake\Core\Plugin::isLoaded("Admin")) {
+            \Admin\Admin::addPlugin(new FirewallAdmin());
+        }
     }
 
     /**
@@ -39,15 +65,25 @@ class FirewallPlugin extends BasePlugin
      */
     public function routes(RouteBuilder $routes): void
     {
-        $routes->plugin(
-            'Firewall',
-            ['path' => '/firewall'],
-            function (RouteBuilder $builder) {
-                // Add custom routes here
+        /**
+         * Apply Shieldon Firewall to the current route scope.
+         */
+//        $routes->registerMiddleware(
+//            'firewall',
+//            new FirewallMiddleware()
+//        );
+//        $routes->applyMiddleware('firewall');
 
-                $builder->fallbacks();
-            }
-        );
+
+//        $routes->plugin(
+//            'Firewall',
+//            ['path' => '/firewall'],
+//            function (RouteBuilder $builder) {
+//                $builder->connect('/panel', ['controller' => 'Shieldon', 'action' => 'index']);
+//                $builder->connect('/panel/**', ['controller' => 'Shieldon', 'action' => 'index']);
+//                $builder->fallbacks();
+//            }
+//        );
         parent::routes($routes);
     }
 
@@ -59,7 +95,9 @@ class FirewallPlugin extends BasePlugin
      */
     public function middleware(MiddlewareQueue $middlewareQueue): MiddlewareQueue
     {
-        // Add your middlewares here
+        if (Configure::read('Firewall.enabled')) {
+            $middlewareQueue->insertBefore(RoutingMiddleware::class, new FirewallMiddleware());
+        }
 
         return $middlewareQueue;
     }
